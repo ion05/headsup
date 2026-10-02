@@ -22,5 +22,9 @@
 	<string>HeadsUp reads your calendars so it can flash upcoming events on screen.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>HeadsUp reads your calendars so it can flash upcoming events on screen.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>HeadsUp uses your Wi-Fi network name to hide event details when you're away from trusted networks. Your location is never stored or shared.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>HeadsUp uses your Wi-Fi network name to hide event details when you're away from trusted networks. Your location is never stored or shared.</string>
 </dict>
 </plist>

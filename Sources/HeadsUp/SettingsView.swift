@@ -4,6 +4,7 @@ import ServiceManagement
 
 struct SettingsView: View {
     @ObservedObject private var engine = Engine.shared
+    @ObservedObject private var wifi = WiFiWatcher.shared
     @State private var openAtLogin = false
     @State private var loginMessage: String?
 
@@ -29,6 +30,11 @@ struct SettingsView: View {
                 }
             } header: {
                 header
+            }
+
+            Section("Auto-hide on untrusted Wi-Fi") {
+                Toggle("Hide event details when not on a trusted Wi-Fi", isOn: $wifi.autoHide)
+                if wifi.autoHide { wifiRows }
             }
 
             Section {
@@ -79,6 +85,66 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Open System Settings") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder private var wifiRows: some View {
+        if wifi.denied { locationBanner }
+
+        LabeledContent {
+            Button("Trust this network") { wifi.trustCurrent() }
+                .disabled(wifi.ssid.map(wifi.trusted.contains) ?? true)
+        } label: {
+            if let ssid = wifi.ssid {
+                Label("Connected to \(ssid)", systemImage: "wifi")
+            } else if wifi.authorized {
+                Label("Not on Wi-Fi", systemImage: "wifi.slash")
+            } else {
+                Label("Network name unavailable", systemImage: "wifi.exclamationmark")
+            }
+        }
+
+        if wifi.trusted.isEmpty {
+            Text("No trusted networks yet. Connect to one you trust, like home, and tap Trust this network.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        ForEach(wifi.trusted, id: \.self) { name in
+            HStack {
+                Label(name, systemImage: name == wifi.ssid ? "checkmark.shield.fill" : "checkmark.shield")
+                Spacer()
+                Button { wifi.remove(name) } label: {
+                    Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Stop trusting \(name)")
+                .accessibilityLabel("Stop trusting \(name)")
+            }
+        }
+
+        Label(engine.offTrustedWiFi ? "Details are hidden right now" : "Details are shown on this network",
+              systemImage: engine.offTrustedWiFi ? "eye.slash" : "eye")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+    }
+
+    private var locationBanner: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "location.slash.fill")
+                .font(.title)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Location access needed").font(.headline)
+                Text("macOS only shares the Wi-Fi name with apps that have Location access. Until you allow it, HeadsUp can't tell where you are, so it hides details in every alert.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open System Settings") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")!)
                 }
                 .padding(.top, 4)
             }

@@ -62,3 +62,39 @@ private func due(_ c: [(alert: Alert, offsets: Set<Int>)], at now: Date, _ fired
     let new = CalSetting(enabled: false, offsets: [0], isPrivate: true)
     #expect(try JSONDecoder().decode(CalSetting.self, from: JSONEncoder().encode(new)) == new)
 }
+
+@Test func wifiHiding() {
+    #expect(!WiFiWatcher.hidden(autoHide: false, ssid: nil, trusted: []))         // feature off
+    #expect(!WiFiWatcher.hidden(autoHide: true, ssid: "Home", trusted: ["Home"]))  // trusted
+    #expect(WiFiWatcher.hidden(autoHide: true, ssid: "PAL3.0", trusted: ["Home"])) // untrusted
+    #expect(WiFiWatcher.hidden(autoHide: true, ssid: nil, trusted: ["Home"]))      // off Wi-Fi / no Location access
+}
+
+@Test func menuBarLabel() {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC")!
+    func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date { cal.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))! }
+    func text(_ events: [Alert], _ now: Date, hide: Bool = false) -> String? { menuBarText(events: events, now: now, hideDetails: hide, calendar: cal) }
+
+    #expect(text([alert("CS 180", start: at(2, 14, 12))], at(2, 14)) == "CS 180 in 12m")
+    #expect(text([alert("CS 180", start: at(2, 16, 5))], at(2, 14)) == "CS 180 in 2h 5m")
+    #expect(text([alert("CS 180", start: at(2, 20))], at(2, 14)) == "CS 180 in 6h")      // within 6h
+    #expect(text([alert("CS 180", start: at(2, 21))], at(2, 14)) == nil)                 // 7h away
+    #expect(text([alert("CS 180", start: at(3, 9))], at(2, 21))?.hasPrefix("CS 180 · 9") == true) // after 8 PM: tomorrow's first
+    #expect(text([alert("CS 180", start: at(3, 8))], at(2, 19)) == nil)                  // before 8 PM, 13h away
+    #expect(text([], at(2, 21)) == nil)
+
+    // In progress, but one starting within 10 min wins.
+    let now = at(2, 14)
+    #expect(text([alert("Lab", start: now - 600)], now) == "Lab · now")
+    #expect(text([alert("Lab", start: now - 600), alert("Sync", start: now + 300)], now) == "Sync in 5m")
+    #expect(text([alert("Lab", start: now - 600), alert("Sync", start: now + 1200)], now) == "Lab · now")
+    #expect(text([alert("Lab", start: now - 1800)], now) == nil)                          // ended
+
+    // Privacy and truncation.
+    let secret = Alert(id: "s", itemID: "s", title: "Therapy", start: now + 720, end: now + 4000, calendarTitle: "Cal",
+                       color: .red, location: nil, joinURL: nil, isPrivate: true)
+    #expect(text([secret], now) == "Private event in 12m")
+    #expect(text([alert("CS 180", start: now + 720)], now, hide: true) == "Private event in 12m")
+    #expect(text([alert("Introduction to Algorithms Recitation", start: now + 720)], now) == "Introduction to Algor… in 12m")
+}

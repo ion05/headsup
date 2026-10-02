@@ -7,7 +7,7 @@ import EventKit
     @Published private(set) var hasAccess = false
     /// All event calendars, sorted by source title then calendar title.
     @Published private(set) var calendars: [EKCalendar] = []
-    /// Next (max 5) upcoming non-all-day events in the next 24h from enabled calendars, for the menu.
+    /// Not-yet-ended, non-all-day events from enabled calendars through end of tomorrow, sorted by start, for the menu panel.
     @Published private(set) var upcoming: [Alert] = []
     /// Every alert hides its details, e.g. while screen sharing.
     @Published var hideAllDetails = false {
@@ -45,6 +45,7 @@ import EventKit
     /// Request calendar access, start the timer, observe store changes.
     func start() {
         guard timers.isEmpty else { return }
+        WiFiWatcher.shared.start()
         NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) { _ in
             MainActor.assumeIsolated { Engine.shared.reloadCalendars(); Engine.shared.tick() }
         }
@@ -106,9 +107,10 @@ import EventKit
     private func tick() {
         let now = Date()
         let cals = calendars.filter { setting(for: $0).enabled }
-        // One query covers both alerts and the menu list. Empty array would mean "all calendars" to EventKit.
+        // One query covers both alerts and the menu panel (through end of tomorrow). Empty array would mean "all calendars" to EventKit.
+        let endOfTomorrow = Calendar.current.date(byAdding: .day, value: 2, to: Calendar.current.startOfDay(for: now))!
         let events = cals.isEmpty ? [] : store.events(matching: store.predicateForEvents(
-            withStart: now.addingTimeInterval(-15 * 60), end: now.addingTimeInterval(24 * 3600), calendars: cals))
+            withStart: now.addingTimeInterval(-15 * 60), end: endOfTomorrow, calendars: cals))
         let candidates = events
             .filter { !($0.isAllDay || $0.status == .canceled || $0.attendees?.first(where: \.isCurrentUser)?.participantStatus == .declined) }
             .map { (alert: alert(for: $0), offsets: setting(for: $0.calendar).offsets) }
@@ -116,7 +118,7 @@ import EventKit
         let due = Self.due(candidates: candidates, snoozed: &snoozed, now: now, fired: &fired)
         if !due.isEmpty { onFire?(due) }
 
-        let next = Array(candidates.map(\.alert).filter { $0.end > now }.sorted { $0.start < $1.start }.prefix(5))
+        let next = candidates.map(\.alert).filter { $0.end > now }.sorted { $0.start < $1.start }
         if next != upcoming { upcoming = next }
     }
 
