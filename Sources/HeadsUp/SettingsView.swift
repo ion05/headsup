@@ -1,0 +1,179 @@
+import SwiftUI
+import EventKit
+import ServiceManagement
+
+struct SettingsView: View {
+    @ObservedObject private var engine = Engine.shared
+    @State private var openAtLogin = false
+    @State private var loginMessage: String?
+
+    /// Calendars grouped by account, in the engine's (source, title) order.
+    private var groups: [(source: String, calendars: [EKCalendar])] {
+        Dictionary(grouping: engine.calendars) { $0.source?.title ?? "Other" }
+            .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .map { ($0.key, $0.value) }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                if !engine.hasAccess { accessBanner }
+
+                Toggle("Open at login", isOn: Binding(get: { openAtLogin }, set: setOpenAtLogin))
+                if let loginMessage {
+                    Text(loginMessage).font(.caption).foregroundStyle(.secondary)
+                }
+
+                LabeledContent("See what an alert looks like") {
+                    Button("Send test alert") { engine.testAlert() }
+                }
+            } header: {
+                header
+            }
+
+            Section {
+                Label("Missing a Google calendar? In Calendar → Settings → Accounts → Google → Delegation, turn it on and it'll appear here.", systemImage: "info.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(groups, id: \.source) { group in
+                Section(group.source) {
+                    ForEach(group.calendars, id: \.calendarIdentifier) { CalendarRow(calendar: $0) }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .frame(minWidth: 480, minHeight: 420)
+        .onAppear { refreshLoginStatus() }
+    }
+
+    private var header: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "bell.badge.fill")
+                .font(.system(size: 30))
+                .foregroundStyle(.white, Color.accentColor)
+                .frame(width: 52, height: 52)
+                .background(Color.accentColor.gradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("HeadsUp").font(.title2.bold()).foregroundStyle(.primary)
+                Text("Full-screen reminders, right before your events start.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .textCase(nil)
+        .padding(.bottom, 12)
+    }
+
+    private var accessBanner: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.title)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Calendar access needed").font(.headline)
+                Text("HeadsUp can't see your events yet. Allow full calendar access in System Settings → Privacy & Security → Calendars, then come back here.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open System Settings") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func setOpenAtLogin(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            loginMessage = nil
+        } catch {
+            loginMessage = "Couldn't change this: \(error.localizedDescription)"
+        }
+        refreshLoginStatus()
+    }
+
+    private func refreshLoginStatus() {
+        let status = SMAppService.mainApp.status
+        openAtLogin = status == .enabled
+        if status == .requiresApproval {
+            loginMessage = "Approve HeadsUp in System Settings → General → Login Items."
+        }
+    }
+}
+
+private struct CalendarRow: View {
+    let calendar: EKCalendar
+    // Local copy so the row updates instantly whether or not the engine republishes on update().
+    @State private var setting: CalSetting
+
+    init(calendar: EKCalendar) {
+        self.calendar = calendar
+        _setting = State(initialValue: Engine.shared.setting(for: calendar))
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(Color(cgColor: calendar.cgColor ?? CGColor(gray: 0.5, alpha: 1)))
+                .frame(width: 10, height: 10)
+            Text(calendar.title).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 12)
+            HStack(spacing: 4) {
+                lockChip.padding(.trailing, 6)
+                chip("10m", 600)
+                chip("1m", 60)
+                chip("Start", 0)
+            }
+            .disabled(!setting.enabled)
+            .opacity(setting.enabled ? 1 : 0.35)
+            Toggle("Enabled", isOn: Binding(get: { setting.enabled }, set: { setting.enabled = $0; save() }))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+        }
+    }
+
+    private func chip(_ label: String, _ offset: Int) -> some View {
+        let on = setting.offsets.contains(offset)
+        return Button {
+            if on { setting.offsets.remove(offset) } else { setting.offsets.insert(offset) }
+            save()
+        } label: {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .foregroundStyle(on ? Color.white : Color.secondary)
+                .background(Capsule().fill(on ? Color.accentColor : Color.secondary.opacity(0.15)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(offset == 0 ? "Alert when the event starts" : "Alert \(offset / 60) min before")
+    }
+
+    private var lockChip: some View {
+        let on = setting.isPrivate
+        return Button {
+            setting.isPrivate.toggle()
+            save()
+        } label: {
+            Image(systemName: on ? "lock.fill" : "lock")
+                .font(.caption.weight(.semibold))
+                .frame(width: 14)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .foregroundStyle(on ? Color.white : Color.secondary)
+                .background(Capsule().fill(on ? Color.accentColor : Color.secondary.opacity(0.15)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("Hide details in alerts")
+        .accessibilityLabel("Hide details in alerts")
+    }
+
+    private func save() { Engine.shared.update(setting, for: calendar) }
+}
