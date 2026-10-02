@@ -27,6 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Engine.shared.onFire = { Overlay.show($0) }
             Engine.shared.start()
         }
+        // Dev hook for screenshots: `open HeadsUp.app --args --test-alert`.
+        if CommandLine.arguments.contains("--test-alert") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { MainActor.assumeIsolated { Engine.shared.testAlert() } }
+        }
     }
 }
 

@@ -32,17 +32,20 @@ import SwiftUI
             panel.backgroundColor = .clear
             panel.hidesOnDeactivate = false
             panel.isReleasedWhenClosed = false
-            panel.appearance = NSAppearance(named: .darkAqua)
 
             let blur = NSVisualEffectView()
             blur.material = .fullScreenUI
             blur.blendingMode = .behindWindow
             blur.state = .active
+            // Siblings, not nested: inside the effect view SwiftUI text turns vibrant and washes out.
             let host = NSHostingView(rootView: OverlayView(model: model))
-            host.frame = blur.bounds
-            host.autoresizingMask = [.width, .height]
-            blur.addSubview(host)
-            panel.contentView = blur
+            let root = NSView(frame: screen.frame)
+            for v in [blur, host] as [NSView] {
+                v.frame = root.bounds
+                v.autoresizingMask = [.width, .height]
+                root.addSubview(v)
+            }
+            panel.contentView = root
 
             panel.alphaValue = 0
             panel.orderFrontRegardless()
@@ -91,42 +94,31 @@ private final class OverlayPanel: NSPanel {
     override var canBecomeMain: Bool { true }
 }
 
+/// Content sits directly on the frosted desktop; on macOS 26+ the controls are Liquid Glass.
 private struct OverlayView: View {
     @ObservedObject var model: OverlayModel
+    @Environment(\.colorScheme) private var scheme
 
     private var firstJoinID: String? { model.alerts.first { $0.joinURL != nil }?.id }
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.4).ignoresSafeArea()
+            (scheme == .dark ? Color.black.opacity(0.25) : Color.white.opacity(0.5)).ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(model.alerts) { alert in
-                        if alert.id != model.alerts.first?.id {
-                            Divider().padding(.vertical, 28)
-                        }
-                        AlertRow(alert: alert, isDefault: alert.id == firstJoinID)
-                    }
+            VStack(spacing: 56) {
+                ForEach(model.alerts) { alert in
+                    AlertRow(alert: alert, isDefault: alert.id == firstJoinID, compact: model.alerts.count > 1)
                 }
-                .padding(44)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(.white.opacity(0.12)))
-                .shadow(color: .black.opacity(0.35), radius: 40, y: 20)
-
                 controls
             }
-            .frame(maxWidth: 780)
-            .padding(40)
+            .frame(maxWidth: 900)
+            .padding(60)
         }
     }
 
-    private var controls: some View {
-        HStack(spacing: 10) {
-            Text("Snooze")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-                .padding(.trailing, 4)
+    @ViewBuilder private var controls: some View {
+        let row = HStack(spacing: 8) {
+            Text("Snooze").font(.system(size: 14, weight: .medium)).foregroundStyle(.secondary).padding(.trailing, 4)
             ForEach([1, 5, 10], id: \.self) { mins in
                 Button("\(mins) min") { Overlay.snooze(model.alerts, until: .now + Double(mins * 60)) }
             }
@@ -137,14 +129,20 @@ private struct OverlayView: View {
                     Overlay.dismiss()
                 }
             }
-            Spacer()
-            Button("Dismiss") { Overlay.dismiss() }
+            Spacer().frame(width: 24)
+            Button { Overlay.dismiss() } label: { HStack(spacing: 8) { Text("Dismiss"); keyHint("esc") } }
                 .keyboardShortcut(.cancelAction)
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
-        .padding(.horizontal, 12)
+        if #available(macOS 26, *) {
+            GlassEffectContainer {
+                row.font(.system(size: 14, weight: .medium))
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.extraLarge)
+            }
+        } else {
+            row.buttonStyle(Pill())
+        }
     }
 }
 
@@ -152,59 +150,86 @@ private struct AlertRow: View {
     let alert: Alert
     /// Return joins this alert.
     let isDefault: Bool
+    /// Smaller type when several alerts share the screen.
+    let compact: Bool
 
     /// Read at render time so "Hide Event Details" applies to whatever shows next.
     private var hidden: Bool { alert.isPrivate || Engine.shared.hidingDetails }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 32) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Circle().fill(hidden ? Color.gray : Color(nsColor: alert.color)).frame(width: 10, height: 10)
-                    Text(hidden ? "DETAILS HIDDEN" : alert.calendarTitle.uppercased())
-                        .font(.system(size: 13, weight: .semibold))
-                        .tracking(1)
-                        .foregroundStyle(.secondary)
-                }
+        VStack(spacing: 18) {
+            tag
 
-                (hidden ? Text("\(Image(systemName: "lock.fill")) Private event") : Text(alert.title))
-                    .font(.system(size: 44, weight: .bold))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                    .fixedSize(horizontal: false, vertical: true)
+            (hidden ? Text("\(Image(systemName: "lock.fill")) Private event") : Text(alert.title))
+                .font(.system(size: compact ? 48 : 68, weight: .semibold))
+                .tracking(compact ? -1 : -1.4)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+                .fixedSize(horizontal: false, vertical: true)
 
-                TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                    let (text, urgent) = relative(to: ctx.date)
-                    Text(text)
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(urgent ? Color.orange : Color.primary)
-                        .contentTransition(.numericText())
-                }
-
-                HStack(spacing: 20) {
-                    Label((alert.start..<max(alert.end, alert.start)).formatted(.interval.hour().minute()), systemImage: "clock")
-                    if !hidden, let location = alert.location, !location.isEmpty {
-                        Label(location, systemImage: "mappin.and.ellipse").lineLimit(1)
-                    }
-                }
-                .font(.title3)
-                .foregroundStyle(.secondary)
+            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                let (text, urgent) = relative(to: ctx.date)
+                Text(text)
+                    .font(.system(size: compact ? 24 : 32, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(urgent ? Color.orange : Color.secondary)
+                    .contentTransition(.numericText())
             }
 
-            Spacer(minLength: 0)
-
-            if let url = alert.joinURL {
-                Button { Overlay.join(url) } label: {
-                    Label("Join", systemImage: "video.fill")
-                        .font(.title2.weight(.semibold))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 8)
+            HStack(spacing: 18) {
+                Label((alert.start..<max(alert.end, alert.start)).formatted(.interval.hour().minute()), systemImage: "clock")
+                if !hidden, let location = alert.location {
+                    Label(location, systemImage: "mappin").lineLimit(1)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
+            }
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(.secondary)
+
+            if let url = alert.joinURL { join(url).padding(.top, 14) }
+        }
+    }
+
+    /// Calendar name as a small pill tinted with its color.
+    private var tag: some View {
+        let color = hidden ? Color.secondary : Color(nsColor: alert.color)
+        return HStack(spacing: 7) {
+            if hidden { Image(systemName: "eye.slash").font(.system(size: 11, weight: .semibold)) }
+            else { Circle().fill(color).frame(width: 8, height: 8) }
+            Text(hidden ? "Details hidden" : alert.calendarTitle)
+        }
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(hidden ? Color.secondary : Color.primary.opacity(0.75))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.16), in: Capsule())
+    }
+
+    @ViewBuilder private func join(_ url: URL) -> some View {
+        let label = HStack(spacing: 10) {
+            Image(systemName: "video.fill")
+            Text("Join")
+            if isDefault { keyHint("↩").padding(.leading, 2) }
+        }
+        if #available(macOS 26, *) {
+            // .glassProminent on the default (Return) button renders as a small rounded rect on macOS 27,
+            // so the capsule is built from a tinted interactive glass effect instead.
+            Button { Overlay.join(url) } label: {
+                label.font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 30)
+                    .frame(height: 52)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
+            // Glass drops its tint when the app isn't frontmost; keep Join blue regardless.
+            .background(Color.accentColor, in: Capsule())
+            .keyboardShortcut(isDefault ? .defaultAction : nil)
+        } else {
+            Button { Overlay.join(url) } label: { label }
+                .buttonStyle(Pill(prominent: true))
                 .keyboardShortcut(isDefault ? .defaultAction : nil)
-            }
         }
     }
 
@@ -214,5 +239,42 @@ private struct AlertRow: View {
         if mins > 0 { return ("Starts in \(duration)", false) }
         if mins == 0 { return ("Starting now", true) }
         return ("Started \(duration) ago", true)
+    }
+}
+
+/// Little key hint shown inside a button.
+private func keyHint(_ s: String) -> some View {
+    Text(s).font(.system(size: 12, weight: .medium)).opacity(0.5)
+}
+
+/// Pre-macOS 26 fallback for the glass buttons: soft capsule with hover feedback. Prominent = big accent Join.
+private struct Pill: ButtonStyle {
+    var prominent = false
+    func makeBody(configuration: Configuration) -> some View { PillBody(configuration: configuration, prominent: prominent) }
+
+    private struct PillBody: View {
+        let configuration: Configuration
+        let prominent: Bool
+        @State private var hovering = false
+        @Environment(\.colorScheme) private var scheme
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: prominent ? 19 : 14, weight: prominent ? .semibold : .medium))
+                .padding(.horizontal, prominent ? 30 : 16)
+                .frame(height: prominent ? 52 : 34)
+                .foregroundStyle(prominent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .background(fill, in: Capsule())
+                .scaleEffect(configuration.isPressed ? 0.97 : 1)
+                .contentShape(Capsule())
+                .onHover { hovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovering)
+        }
+
+        private var fill: Color {
+            if prominent { return .accentColor.opacity(hovering ? 0.88 : 1) }
+            // Light: soft white pills that lift off the frost. Dark: faint white wash.
+            return .white.opacity(scheme == .dark ? (hovering ? 0.18 : 0.1) : (hovering ? 0.9 : 0.6))
+        }
     }
 }
