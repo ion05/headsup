@@ -118,7 +118,7 @@ struct MenuPanel: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Calendar access needed").font(.system(size: 13, weight: .semibold))
                 Text("HeadsUp can't see your events yet.").font(.system(size: 11)).foregroundStyle(.secondary)
-                Button("Open Settings…", action: openSettings).controlSize(.small).padding(.top, 2)
+                Button("Open Settings…", action: openSettings).glassButtonStyle().controlSize(.small).padding(.top, 2)
             }
         }
         .padding(12)
@@ -146,9 +146,22 @@ struct MenuPanel: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
 
-            MenuButton(title: "Test Alert", systemImage: "bell.badge") { engine.testAlert() }
-            MenuButton(title: "Settings…", systemImage: "gearshape", shortcut: ",", action: openSettings)
-            MenuButton(title: "Quit HeadsUp", systemImage: "power", shortcut: "q") { NSApp.terminate(nil) }
+            let buttons = HStack(spacing: 8) {
+                Button("Test Alert", systemImage: "bell.badge") { engine.testAlert() }
+                Spacer()
+                Button("Settings…", systemImage: "gearshape", action: openSettings).keyboardShortcut(",")
+                Button("Quit", systemImage: "power") { NSApp.terminate(nil) }.keyboardShortcut("q")
+            }
+            .font(.system(size: 12, weight: .medium))
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .padding(.horizontal, 4)
+            .padding(.top, 6)
+            if #available(macOS 26, *) {
+                GlassEffectContainer(spacing: 0) { buttons.buttonStyle(.glass) }
+            } else {
+                buttons.buttonStyle(.bordered)
+            }
         }
     }
 
@@ -203,18 +216,22 @@ private struct NextUpCard: View {
             .fixedSize(horizontal: false, vertical: true)
 
             if let url = alert.joinURL {
-                Button { NSWorkspace.shared.open(url) } label: {
-                    Label("Join", systemImage: "video.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(maxWidth: .infinity)
+                let label = Label("Join", systemImage: "video.fill").font(.system(size: 13, weight: .semibold))
+                if #available(macOS 26, *) {
+                    Button { NSWorkspace.shared.open(url) } label: {
+                        label.foregroundStyle(.white).frame(maxWidth: .infinity).frame(height: 32).contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .joinGlass()
+                } else {
+                    Button { NSWorkspace.shared.open(url) } label: { label.frame(maxWidth: .infinity) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
             }
         }
         .padding(12)
-        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(color.opacity(0.25)))
+        .cardSurface(color)
         .onHover { hovering = $0 }
         .contextMenu { eventMenu(alert, isMarkedPrivate: isMarkedPrivate) }
     }
@@ -256,47 +273,43 @@ private struct EventRow: View {
                 Button { NSWorkspace.shared.open(url) } label: {
                     Label("Join", systemImage: "video.fill").font(.system(size: 11, weight: .semibold))
                 }
-                .buttonStyle(.bordered)
+                .glassButtonStyle()
                 .buttonBorderShape(.capsule)
                 .controlSize(.small)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
-        .background(hovering ? Color.primary.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .hoverChip(hovering)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .contextMenu { eventMenu(alert, isMarkedPrivate: isMarkedPrivate) }
     }
 }
 
-/// Native-menu-looking row for the footer.
-private struct MenuButton: View {
-    let title: String
-    let systemImage: String
-    var shortcut: KeyEquivalent?
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage).frame(width: 16).foregroundStyle(.secondary)
-                Text(title)
-                Spacer()
-                if let shortcut {
-                    Text("⌘\(String(shortcut.character).uppercased())").foregroundStyle(.tertiary)
-                }
-            }
-            .font(.system(size: 13))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .background(hovering ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .contentShape(Rectangle())
+private extension View {
+    /// Next-up card: tinted Liquid Glass on macOS 26+, soft tinted fill before.
+    @ViewBuilder func cardSurface(_ color: Color) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        if #available(macOS 26, *) {
+            glassEffect(.regular.tint(color.opacity(0.15)), in: shape)
+        } else {
+            background(color.opacity(0.1), in: shape).overlay(shape.strokeBorder(color.opacity(0.25)))
         }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .keyboardShortcut(shortcut.map { KeyboardShortcut($0) })
+    }
+
+    /// Row hover highlight: a glass chip on macOS 26+, faint fill before.
+    @ViewBuilder func hoverChip(_ on: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        if #available(macOS 26, *) {
+            glassEffect(on ? .regular : .identity, in: shape)
+        } else {
+            background(on ? Color.primary.opacity(0.06) : .clear, in: shape)
+        }
+    }
+
+    @ViewBuilder func glassButtonStyle() -> some View {
+        if #available(macOS 26, *) { buttonStyle(.glass) } else { buttonStyle(.bordered) }
     }
 }
 
@@ -308,11 +321,10 @@ private func timeRange(_ alert: Alert) -> String {
     Button { Engine.shared.setPrivate(alert.itemID, !on) } label: {
         Image(systemName: on ? "lock.fill" : "lock.open")
             .font(.system(size: 11, weight: .medium))
-            .frame(width: 22, height: 22)
-            .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
-    .foregroundStyle(.secondary)
+    .glassButtonStyle()
+    .buttonBorderShape(.circle)
+    .controlSize(.small)
     .help(on ? "Show this event's details in alerts" : "Hide this event's details in alerts")
 }
 

@@ -222,9 +222,7 @@ private struct AlertRow: View {
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
-            // Glass drops its tint when the app isn't frontmost; keep Join blue regardless.
-            .background(Color.accentColor, in: Capsule())
+            .joinGlass()
             .keyboardShortcut(isDefault ? .defaultAction : nil)
         } else {
             Button { Overlay.join(url) } label: { label }
@@ -239,6 +237,16 @@ private struct AlertRow: View {
         if mins > 0 { return ("Starts in \(duration)", false) }
         if mins == 0 { return ("Starting now", true) }
         return ("Started \(duration) ago", true)
+    }
+}
+
+extension View {
+    /// Blue Liquid Glass capsule for Join buttons (alert and menu panel).
+    @available(macOS 26, *)
+    func joinGlass() -> some View {
+        glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
+            // Glass drops its tint when the app isn't frontmost; keep Join blue regardless.
+            .background(Color.accentColor, in: Capsule())
     }
 }
 
