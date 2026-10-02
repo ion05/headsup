@@ -44,8 +44,16 @@ struct SettingsView: View {
             }
 
             ForEach(groups, id: \.source) { group in
-                Section(group.source) {
+                let on = !engine.offAccounts.contains(group.source)
+                Section {
                     ForEach(group.calendars, id: \.calendarIdentifier) { CalendarRow(calendar: $0) }
+                        .disabled(!on)
+                        .opacity(on ? 1 : 0.4)
+                } header: {
+                    Toggle(group.source, isOn: Binding(get: { on }, set: { engine.setAccount(group.source, on: $0) }))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .help("Turn off every calendar in this account")
                 }
             }
         }

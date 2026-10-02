@@ -29,6 +29,9 @@ import EventKit
     private static let privateItemsKey = "privateItems"
     /// calendarItemIdentifiers the user marked private from the menu.
     private(set) var privateItems: Set<String> = []
+    private static let offAccountsKey = "offAccounts"
+    /// Account (EKSource) titles switched off as a whole. Keeps each calendar's own choice for when it's back on.
+    private(set) var offAccounts: Set<String> = []
     /// "<alert.id>|<offset>" -> when the key can be forgotten (end of its grace window).
     private var fired: [String: Date] = [:]
     private var snoozed: [(alert: Alert, at: Date)] = []
@@ -39,6 +42,7 @@ import EventKit
             settings = (try? JSONDecoder().decode([String: CalSetting].self, from: data)) ?? [:]
         }
         privateItems = Set(UserDefaults.standard.stringArray(forKey: Self.privateItemsKey) ?? [])
+        offAccounts = Set(UserDefaults.standard.stringArray(forKey: Self.offAccountsKey) ?? [])
         hideAllDetails = UserDefaults.standard.bool(forKey: Self.hideAllKey)
     }
 
@@ -78,6 +82,13 @@ import EventKit
         tick()
     }
 
+    func setAccount(_ title: String, on: Bool) {
+        objectWillChange.send()
+        if on { offAccounts.remove(title) } else { offAccounts.insert(title) }
+        UserDefaults.standard.set(Array(offAccounts), forKey: Self.offAccountsKey)
+        tick()
+    }
+
     /// Marks every occurrence of an event private (or not).
     func setPrivate(_ itemID: String, _ on: Bool) {
         objectWillChange.send()
@@ -106,7 +117,7 @@ import EventKit
 
     private func tick() {
         let now = Date()
-        let cals = calendars.filter { setting(for: $0).enabled }
+        let cals = calendars.filter { setting(for: $0).enabled && !offAccounts.contains($0.source?.title ?? "Other") }
         // One query covers both alerts and the menu panel (through end of tomorrow). Empty array would mean "all calendars" to EventKit.
         let endOfTomorrow = Calendar.current.date(byAdding: .day, value: 2, to: Calendar.current.startOfDay(for: now))!
         let events = cals.isEmpty ? [] : store.events(matching: store.predicateForEvents(
