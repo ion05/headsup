@@ -8,11 +8,14 @@ struct SettingsView: View {
     @State private var openAtLogin = false
     @State private var loginMessage: String?
 
-    /// Calendars grouped by account, in the engine's (source, title) order.
-    private var groups: [(source: String, calendars: [EKCalendar])] {
-        Dictionary(grouping: engine.calendars) { $0.source?.title ?? "Other" }
-            .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
-            .map { ($0.key, $0.value) }
+    /// Calendars grouped by account (sourceIdentifier), sorted by the name shown.
+    private var groups: [(id: String, name: String, kind: String, calendars: [EKCalendar])] {
+        Dictionary(grouping: engine.calendars) { $0.source?.sourceIdentifier ?? "" }
+            .map { id, cals in
+                let kind = cals.first?.source?.title ?? "Other"
+                return (id, engine.accountNames[id] ?? kind, kind, cals)
+            }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     var body: some View {
@@ -43,14 +46,21 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(groups, id: \.source) { group in
-                let on = !engine.offAccounts.contains(group.source)
+            ForEach(groups, id: \.id) { group in
+                let on = !engine.offAccounts.contains(group.id)
                 Section {
                     ForEach(group.calendars, id: \.calendarIdentifier) { CalendarRow(calendar: $0) }
                         .disabled(!on)
                         .opacity(on ? 1 : 0.4)
                 } header: {
-                    Toggle(group.source, isOn: Binding(get: { on }, set: { engine.setAccount(group.source, on: $0) }))
+                    Toggle(isOn: Binding(get: { on }, set: { engine.setAccount(group.id, on: $0) })) {
+                        HStack(spacing: 6) {
+                            Text(group.name).textCase(nil)
+                            if group.name != group.kind {
+                                Text(group.kind).textCase(nil).foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .help("Turn off every calendar in this account")

@@ -29,9 +29,11 @@ import EventKit
     private static let privateItemsKey = "privateItems"
     /// calendarItemIdentifiers the user marked private from the menu.
     private(set) var privateItems: Set<String> = []
-    private static let offAccountsKey = "offAccounts"
-    /// Account (EKSource) titles switched off as a whole. Keeps each calendar's own choice for when it's back on.
+    private static let offAccountsKey = "offSources"
+    /// sourceIdentifiers of accounts switched off as a whole. Keeps each calendar's own choice for when it's back on.
     private(set) var offAccounts: Set<String> = []
+    /// sourceIdentifier -> what Settings shows for the account, ideally its email.
+    @Published private(set) var accountNames: [String: String] = [:]
     /// "<alert.id>|<offset>" -> when the key can be forgotten (end of its grace window).
     private var fired: [String: Date] = [:]
     private var snoozed: [(alert: Alert, at: Date)] = []
@@ -82,9 +84,9 @@ import EventKit
         tick()
     }
 
-    func setAccount(_ title: String, on: Bool) {
+    func setAccount(_ sourceID: String, on: Bool) {
         objectWillChange.send()
-        if on { offAccounts.remove(title) } else { offAccounts.insert(title) }
+        if on { offAccounts.remove(sourceID) } else { offAccounts.insert(sourceID) }
         UserDefaults.standard.set(Array(offAccounts), forKey: Self.offAccountsKey)
         tick()
     }
@@ -113,11 +115,32 @@ import EventKit
     private func reloadCalendars() {
         calendars = store.calendars(for: .event)
             .sorted { ($0.source?.title ?? "", $0.title) < ($1.source?.title ?? "", $1.title) }
+        // EventKit doesn't expose an account's email, so infer it from the user's own address on recent events.
+        // ponytail: 90-day scan on every calendar reload; cache per source if reloads get slow.
+        let now = Date()
+        var names: [String: String] = [:]
+        for (id, cals) in Dictionary(grouping: calendars, by: { $0.source?.sourceIdentifier ?? "" }) {
+            let events = store.events(matching: store.predicateForEvents(
+                withStart: now.addingTimeInterval(-60 * 86400), end: now.addingTimeInterval(30 * 86400), calendars: cals))
+            let mine = events.lazy.compactMap { e -> URL? in
+                ([e.organizer].compactMap { $0 } + (e.attendees ?? [])).first { $0.isCurrentUser }?.url
+            }.first
+            names[id] = Self.accountName(title: cals.first?.source?.title ?? "Other", calendarTitles: cals.map(\.title), myURL: mine)
+        }
+        accountNames = names
+    }
+
+    /// Account title if it's an email, else a calendar named like an email (Google's primary), else the user's own address, else the title.
+    nonisolated static func accountName(title: String, calendarTitles: [String], myURL: URL?) -> String {
+        if title.contains("@") { return title }
+        if let email = calendarTitles.first(where: { $0.contains("@") }) { return email }
+        if let url = myURL, url.scheme == "mailto", let email = url.absoluteString.split(separator: ":").last { return String(email) }
+        return title
     }
 
     private func tick() {
         let now = Date()
-        let cals = calendars.filter { setting(for: $0).enabled && !offAccounts.contains($0.source?.title ?? "Other") }
+        let cals = calendars.filter { setting(for: $0).enabled && !offAccounts.contains($0.source?.sourceIdentifier ?? "") }
         // One query covers both alerts and the menu panel (through end of tomorrow). Empty array would mean "all calendars" to EventKit.
         let endOfTomorrow = Calendar.current.date(byAdding: .day, value: 2, to: Calendar.current.startOfDay(for: now))!
         let events = cals.isEmpty ? [] : store.events(matching: store.predicateForEvents(

@@ -98,3 +98,11 @@ private func due(_ c: [(alert: Alert, offsets: Set<Int>)], at now: Date, _ fired
     #expect(text([alert("CS 180", start: now + 720)], now, hide: true) == "Private event in 12m")
     #expect(text([alert("Introduction to Algorithms Recitation", start: now + 720)], now) == "Introduction to Algor… in 12m")
 }
+
+@Test func accountNames() {
+    let name = Engine.accountName
+    #expect(name("tedx@gmail.com", ["Events"], nil) == "tedx@gmail.com")
+    #expect(name("Google", ["School", "me@gmail.com"], URL(string: "mailto:other@gmail.com")) == "me@gmail.com")
+    #expect(name("Exchange", ["Calendar"], URL(string: "mailto:agarw357@purdue.edu")) == "agarw357@purdue.edu")
+    #expect(name("iCloud", ["Home"], nil) == "iCloud")
+}
