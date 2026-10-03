@@ -5,13 +5,11 @@
 set -e
 cd "$(dirname "$0")"
 
-if [ "${UNIVERSAL:-0}" = 1 ]; then
-    swift build -c release --arch arm64 --arch x86_64
-    BIN=.build/apple/Products/Release/HeadsUp
-else
-    swift build -c release
-    BIN=.build/release/HeadsUp
-fi
+FLAGS="-c release"
+[ "${UNIVERSAL:-0}" = 1 ] && FLAGS="$FLAGS --arch arm64 --arch x86_64"
+swift build $FLAGS
+# The universal product path moves between Xcode versions, so ask SwiftPM.
+BIN="$(swift build $FLAGS --show-bin-path)/HeadsUp"
 APP=build/HeadsUp.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
