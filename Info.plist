@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleExecutable</key>
 	<string>HeadsUp</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.aayanagarwal.headsup</string>
 	<key>CFBundleName</key>
@@ -11,7 +13,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
@@ -26,5 +28,11 @@
 	<string>HeadsUp uses your Wi-Fi network name to hide event details when you're away from trusted networks. Your location is never stored or shared.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>HeadsUp uses your Wi-Fi network name to hide event details when you're away from trusted networks. Your location is never stored or shared.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/ion05/headsup/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>znvBepOktV3q03IezPF38iTKETkiRQYidBk+552YS+Q=</string>
 </dict>
 </plist>

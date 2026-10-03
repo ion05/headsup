@@ -1,5 +1,9 @@
 import Combine
+import Sparkle
 import SwiftUI
+
+/// Sparkle. Started at launch so it can check the feed daily (SUEnableAutomaticChecks).
+@MainActor let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
 @main
 struct HeadsUpApp: App {
@@ -24,6 +28,7 @@ struct HeadsUpApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         MainActor.assumeIsolated {
+            _ = updaterController
             Engine.shared.onFire = { Overlay.show($0) }
             Engine.shared.start()
         }

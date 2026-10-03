@@ -1,12 +1,14 @@
 import SwiftUI
 import EventKit
 import ServiceManagement
+import Sparkle
 
 struct SettingsView: View {
     @ObservedObject private var engine = Engine.shared
     @ObservedObject private var wifi = WiFiWatcher.shared
     @State private var openAtLogin = false
     @State private var loginMessage: String?
+    @State private var autoUpdate = updaterController.updater.automaticallyChecksForUpdates
 
     /// Calendars grouped by account (sourceIdentifier), sorted by the name shown.
     private var groups: [(id: String, name: String, kind: String, calendars: [EKCalendar])] {
@@ -30,6 +32,18 @@ struct SettingsView: View {
 
                 LabeledContent("See what an alert looks like") {
                     Button("Send test alert") { engine.testAlert() }
+                }
+
+                Toggle("Automatically check for updates", isOn: Binding(get: { autoUpdate }, set: {
+                    autoUpdate = $0
+                    updaterController.updater.automaticallyChecksForUpdates = $0
+                }))
+                LabeledContent("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")") {
+                    Button("Check Now") {
+                        // Accessory app: activate or Sparkle's window opens behind others.
+                        NSApp.activate(ignoringOtherApps: true)
+                        updaterController.checkForUpdates(nil)
+                    }
                 }
             } header: {
                 header
