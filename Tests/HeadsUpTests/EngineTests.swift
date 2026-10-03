@@ -3,8 +3,8 @@ import Testing
 @testable import HeadsUp
 
 @Test func meetingLinks() {
-    #expect(meetingURL(in: ["Join: https://purdue.zoom.us/j/123456789?pwd=AbC123xyz."])?.absoluteString
-            == "https://purdue.zoom.us/j/123456789?pwd=AbC123xyz")
+    #expect(meetingURL(in: ["Join: https://example.zoom.us/j/123456789?pwd=AbC123xyz."])?.absoluteString
+            == "https://example.zoom.us/j/123456789?pwd=AbC123xyz")
     #expect(meetingURL(in: [nil, nil, "Join with Google Meet: https://meet.google.com/abc-defg-hij\nOr dial: +1 555"])?.absoluteString
             == "https://meet.google.com/abc-defg-hij")
     let teams = "https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=%7b%22Tid%22%3a%22x%22%7d"
@@ -59,7 +59,7 @@ private func due(_ c: [(alert: Alert, offsets: Set<Int>)], at now: Date, _ fired
 @Test func wifiHiding() {
     #expect(!WiFiWatcher.hidden(autoHide: false, ssid: nil, trusted: []))         // feature off
     #expect(!WiFiWatcher.hidden(autoHide: true, ssid: "Home", trusted: ["Home"]))  // trusted
-    #expect(WiFiWatcher.hidden(autoHide: true, ssid: "PAL3.0", trusted: ["Home"])) // untrusted
+    #expect(WiFiWatcher.hidden(autoHide: true, ssid: "CoffeeShop", trusted: ["Home"])) // untrusted
     #expect(WiFiWatcher.hidden(autoHide: true, ssid: nil, trusted: ["Home"]))      // off Wi-Fi / no Location access
 }
 
@@ -96,6 +96,6 @@ private func due(_ c: [(alert: Alert, offsets: Set<Int>)], at now: Date, _ fired
     let name = Engine.accountName
     #expect(name("tedx@gmail.com", ["Events"], nil) == "tedx@gmail.com")
     #expect(name("Google", ["School", "me@gmail.com"], URL(string: "mailto:other@gmail.com")) == "me@gmail.com")
-    #expect(name("Exchange", ["Calendar"], URL(string: "mailto:agarw357@purdue.edu")) == "agarw357@purdue.edu")
+    #expect(name("Exchange", ["Calendar"], URL(string: "mailto:me@example.edu")) == "me@example.edu")
     #expect(name("iCloud", ["Home"], nil) == "iCloud")
 }
