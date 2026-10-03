@@ -64,7 +64,7 @@ create-dmg \
     --volicon design/AppIcon.icns \
     --background design/dmg-background.tiff \
     --window-size 660 400 \
-    --icon-size 112 \
+    --icon-size 128 \
     --text-size 13 \
     --icon "HeadsUp.app" 165 185 \
     --hide-extension "HeadsUp.app" \
