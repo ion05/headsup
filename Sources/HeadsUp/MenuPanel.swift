@@ -313,7 +313,7 @@ private extension View {
     }
 }
 
-private func timeRange(_ alert: Alert) -> String {
+func timeRange(_ alert: Alert) -> String {
     (alert.start..<max(alert.end, alert.start)).formatted(.interval.hour().minute())
 }
 

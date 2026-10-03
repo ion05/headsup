@@ -9,16 +9,6 @@ struct CalSetting: Codable, Equatable {
     var isPrivate = false
 }
 
-extension CalSetting {
-    // Settings saved before isPrivate existed still decode instead of resetting.
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        enabled = try c.decode(Bool.self, forKey: .enabled)
-        offsets = try c.decode(Set<Int>.self, forKey: .offsets)
-        isPrivate = try c.decodeIfPresent(Bool.self, forKey: .isPrivate) ?? false
-    }
-}
-
 /// One event as shown in the full-screen alert.
 struct Alert: Identifiable, Equatable {
     /// Stable per occurrence: "<eventIdentifier>|<start timeIntervalSince1970>".

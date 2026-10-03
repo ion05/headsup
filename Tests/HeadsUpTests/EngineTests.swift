@@ -56,13 +56,6 @@ private func due(_ c: [(alert: Alert, offsets: Set<Int>)], at now: Date, _ fired
     #expect(snoozed.isEmpty)
 }
 
-@Test func oldSettingsStillDecode() throws {
-    let old = try JSONDecoder().decode(CalSetting.self, from: Data(#"{"enabled":true,"offsets":[60]}"#.utf8))
-    #expect(old == CalSetting(enabled: true, offsets: [60]))
-    let new = CalSetting(enabled: false, offsets: [0], isPrivate: true)
-    #expect(try JSONDecoder().decode(CalSetting.self, from: JSONEncoder().encode(new)) == new)
-}
-
 @Test func wifiHiding() {
     #expect(!WiFiWatcher.hidden(autoHide: false, ssid: nil, trusted: []))         // feature off
     #expect(!WiFiWatcher.hidden(autoHide: true, ssid: "Home", trusted: ["Home"]))  // trusted

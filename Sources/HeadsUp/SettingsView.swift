@@ -91,23 +91,9 @@ struct SettingsView: View {
     }
 
     private var accessBanner: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "calendar.badge.exclamationmark")
-                .font(.title)
-                .foregroundStyle(.orange)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Calendar access needed").font(.headline)
-                Text("HeadsUp can't see your events yet. Allow full calendar access in System Settings → Privacy & Security → Calendars, then come back here.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Open System Settings") {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
-                }
-                .padding(.top, 4)
-            }
-        }
-        .padding(.vertical, 6)
+        banner("calendar.badge.exclamationmark", "Calendar access needed",
+               "HeadsUp can't see your events yet. Allow full calendar access in System Settings → Privacy & Security → Calendars, then come back here.",
+               pane: "Privacy_Calendars")
     }
 
     @ViewBuilder private var wifiRows: some View {
@@ -151,18 +137,20 @@ struct SettingsView: View {
     }
 
     private var locationBanner: some View {
+        banner("location.slash.fill", "Location access needed",
+               "macOS only shares the Wi-Fi name with apps that have Location access. Until you allow it, HeadsUp can't tell where you are, so it hides details in every alert.",
+               pane: "Privacy_LocationServices")
+    }
+
+    /// Orange warning with a button to the given Privacy & Security pane.
+    private func banner(_ icon: String, _ title: String, _ text: String, pane: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "location.slash.fill")
-                .font(.title)
-                .foregroundStyle(.orange)
+            Image(systemName: icon).font(.title).foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 6) {
-                Text("Location access needed").font(.headline)
-                Text("macOS only shares the Wi-Fi name with apps that have Location access. Until you allow it, HeadsUp can't tell where you are, so it hides details in every alert.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(title).font(.headline)
+                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button("Open System Settings") {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")!)
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
                 }
                 .padding(.top, 4)
             }
@@ -227,13 +215,7 @@ private struct CalendarRow: View {
             if on { setting.offsets.remove(offset) } else { setting.offsets.insert(offset) }
             save()
         } label: {
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 3)
-                .foregroundStyle(on ? Color.white : Color.secondary)
-                .background(Capsule().fill(on ? Color.accentColor : Color.secondary.opacity(0.15)))
-                .contentShape(Capsule())
+            Text(label).padding(.horizontal, 3).capsuleChip(on)
         }
         .buttonStyle(.plain)
         .help(offset == 0 ? "Alert when the event starts" : "Alert \(offset / 60) min before")
@@ -245,14 +227,7 @@ private struct CalendarRow: View {
             setting.isPrivate.toggle()
             save()
         } label: {
-            Image(systemName: on ? "lock.fill" : "lock")
-                .font(.caption.weight(.semibold))
-                .frame(width: 14)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .foregroundStyle(on ? Color.white : Color.secondary)
-                .background(Capsule().fill(on ? Color.accentColor : Color.secondary.opacity(0.15)))
-                .contentShape(Capsule())
+            Image(systemName: on ? "lock.fill" : "lock").frame(width: 14).capsuleChip(on)
         }
         .buttonStyle(.plain)
         .help("Hide details in alerts")
@@ -260,4 +235,16 @@ private struct CalendarRow: View {
     }
 
     private func save() { Engine.shared.update(setting, for: calendar) }
+}
+
+private extension View {
+    /// Small toggle chip: accent when on, faint gray when off.
+    func capsuleChip(_ on: Bool) -> some View {
+        font(.caption.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .foregroundStyle(on ? Color.white : Color.secondary)
+            .background(Capsule().fill(on ? Color.accentColor : Color.secondary.opacity(0.15)))
+            .contentShape(Capsule())
+    }
 }

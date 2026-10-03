@@ -14,11 +14,10 @@ import SwiftUI
             return
         }
 
-        var unique: [Alert] = []
-        for a in alerts where !unique.contains(where: { $0.id == a.id }) { unique.append(a) }
-        guard !unique.isEmpty else { return }
+        // Engine.due() already dedupes, so a first showing takes the list as is.
+        guard !alerts.isEmpty else { return }
 
-        let model = OverlayModel(alerts: unique)
+        let model = OverlayModel(alerts: alerts)
         self.model = model
         NSApp.activate(ignoringOtherApps: true)
         NSSound(named: "Glass")?.play()
@@ -178,7 +177,7 @@ private struct AlertRow: View {
             }
 
             HStack(spacing: 18) {
-                Label((alert.start..<max(alert.end, alert.start)).formatted(.interval.hour().minute()), systemImage: "clock")
+                Label(timeRange(alert), systemImage: "clock")
                 if !hidden, let location = alert.location {
                     Label(location, systemImage: "mappin").lineLimit(1)
                 }
