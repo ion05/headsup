@@ -17,6 +17,7 @@ It reads whatever Apple Calendar can see (iCloud, Google, Exchange/Outlook), so 
 - **Per-calendar alert times**: 10 minutes before, 1 minute before, at start, or any mix.
 - **Pick what alerts**: turn whole accounts or single calendars on and off.
 - **Private events**: hide the details of one event, a whole calendar, or everything at once. Can also hide automatically when you're away from a trusted Wi-Fi network, so a meeting title never pops up on a projector or in a café.
+- **Stays out of your presentations**: no full-screen alert while you're sharing, recording or mirroring your screen, or playing a Keynote or PowerPoint slideshow.
 - **Menu-bar countdown** to your next event, plus a panel with today's agenda and Join buttons.
 - Skips all-day, declined and canceled events. Events that start together share one alert.
 

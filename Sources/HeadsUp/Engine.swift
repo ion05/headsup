@@ -150,7 +150,8 @@ import EventKit
             .map { (alert: alert(for: $0), offsets: setting(for: $0.calendar).offsets) }
 
         let due = Self.due(candidates: candidates, snoozed: &snoozed, now: now, fired: &fired)
-        if !due.isEmpty { onFire?(due) }
+        // Skipped, not postponed: a heads-up after the share ends would be late anyway.
+        if !due.isEmpty, !audienceWatching() { onFire?(due) }
 
         let next = candidates.map(\.alert).filter { $0.end > now }.sorted { $0.start < $1.start }
         if next != upcoming { upcoming = next }
@@ -187,5 +188,29 @@ import EventKit
         snoozed.removeAll { $0.at <= now }
         var seen = Set<String>()
         return out.filter { seen.insert($0.id).inserted }.sorted { $0.start < $1.start }
+    }
+}
+
+/// Screen shared, recorded or mirrored, or a slideshow playing: alerts are skipped so they never pop up in front of an audience.
+@MainActor func audienceWatching() -> Bool {
+    // Private SkyLight call: true while anything captures the screen (Zoom, Meet, Teams, QuickTime, OBS, AirPlay).
+    // ponytail: private API, looked up at runtime so a future macOS that drops it just stops skipping.
+    if let sym = dlsym(dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY), "SLSIsScreenWatcherPresent"),
+       unsafeBitCast(sym, to: (@convention(c) () -> Bool).self)() { return true }
+
+    var count: UInt32 = 0
+    var displays = [CGDirectDisplayID](repeating: 0, count: 16)
+    CGGetActiveDisplayList(16, &displays, &count)
+    if displays.prefix(Int(count)).contains(where: { CGDisplayIsInMirrorSet($0) != 0 }) { return true }
+
+    // ponytail: only Keynote and PowerPoint; a Google Slides slideshow is a full-screen browser we can't tell apart.
+    guard let front = NSWorkspace.shared.frontmostApplication,
+          ["com.apple.iWork.Keynote", "com.microsoft.Powerpoint"].contains(front.bundleIdentifier ?? "") else { return false }
+    let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    let screens = Set(NSScreen.screens.map { "\(Int($0.frame.width))x\(Int($0.frame.height))" })
+    return windows.contains { w in
+        guard w[kCGWindowOwnerPID as String] as? pid_t == front.processIdentifier,
+              let b = w[kCGWindowBounds as String] as? [String: CGFloat] else { return false }
+        return screens.contains("\(Int(b["Width"] ?? 0))x\(Int(b["Height"] ?? 0))")
     }
 }
