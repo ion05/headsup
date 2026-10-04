@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 — 2026-10-03
+
+- No full-screen alert while you're sharing, recording or mirroring your screen, or playing a Keynote or PowerPoint slideshow.
+
 ## 1.0.0 — 2026-10-03
 
 First public release.
