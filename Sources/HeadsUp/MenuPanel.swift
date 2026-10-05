@@ -48,6 +48,9 @@ struct MenuPanel: View {
         }
         .padding(8)
         .frame(width: 340)
+        .background(.thickMaterial)
+        .overlay(panelShape.strokeBorder(Color(nsColor: .separatorColor)))
+        .background(RoundedWindow(radius: panelRadius))
     }
 
     @ViewBuilder private func agenda(now: Date) -> some View {
@@ -147,15 +150,15 @@ struct MenuPanel: View {
             .padding(.vertical, 5)
 
             let buttons = HStack(spacing: 8) {
-                Button("Test Alert", systemImage: "bell.badge") { engine.testAlert() }
-                Spacer()
-                Button("Settings…", systemImage: "gearshape", action: openSettings).keyboardShortcut(",")
-                Button("Quit", systemImage: "power") { NSApp.terminate(nil) }.keyboardShortcut("q")
+                Button { engine.testAlert() } label: { Label("Test Alert", systemImage: "bell.badge").frame(maxWidth: .infinity) }
+                Button(action: openSettings) { Label("Settings…", systemImage: "gearshape").frame(maxWidth: .infinity) }
+                    .keyboardShortcut(",")
+                Button { NSApp.terminate(nil) } label: { Label("Quit", systemImage: "power").frame(maxWidth: .infinity) }
+                    .keyboardShortcut("q")
             }
             .font(.system(size: 12, weight: .medium))
             .buttonBorderShape(.capsule)
             .controlSize(.large)
-            .padding(.horizontal, 4)
             .padding(.top, 6)
             if #available(macOS 26, *) {
                 GlassEffectContainer(spacing: 0) { buttons.buttonStyle(.glass) }
@@ -287,10 +290,45 @@ private struct EventRow: View {
     }
 }
 
+private let panelRadius: CGFloat = 26
+private let panelShape = RoundedRectangle(cornerRadius: panelRadius, style: .continuous)
+
+/// macOS 27 gives the menu-bar window near-square corners and a see-through background,
+/// so clip the window to our own radius; the panel paints its own background.
+private struct RoundedWindow: NSViewRepresentable {
+    let radius: CGFloat
+    func makeNSView(context: Context) -> NSView { Hook(radius: radius) }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class Hook: NSView {
+        let radius: CGFloat
+        init(radius: CGFloat) { self.radius = radius; super.init(frame: .zero) }
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func viewDidMoveToWindow() {
+            // The frame view above contentView draws the system background, so clip there.
+            guard let window, let frame = window.contentView?.superview else { return }
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            frame.wantsLayer = true
+            frame.layer?.cornerRadius = radius
+            frame.layer?.cornerCurve = .continuous
+            frame.layer?.masksToBounds = true
+        }
+
+        // The shadow is traced from the window's pixels; retrace it when the panel resizes.
+        override func layout() {
+            super.layout()
+            DispatchQueue.main.async { [weak self] in self?.window?.invalidateShadow() }
+        }
+    }
+}
+
 private extension View {
     /// Next-up card: tinted Liquid Glass on macOS 26+, soft tinted fill before.
     @ViewBuilder func cardSurface(_ color: Color) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        // Concentric with the window: its radius minus the panel's 8pt inset.
+        let shape = RoundedRectangle(cornerRadius: panelRadius - 8, style: .continuous)
         if #available(macOS 26, *) {
             glassEffect(.regular.tint(color.opacity(0.15)), in: shape)
         } else {
