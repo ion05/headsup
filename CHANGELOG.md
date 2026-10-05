@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 — 2026-10-05
+
+- The menu-bar panel has rounded corners and a solid background on macOS 27, and its Test Alert, Settings and Quit buttons are evenly sized.
+
 ## 1.0.1 — 2026-10-03
 
 - No full-screen alert while you're sharing, recording or mirroring your screen, or playing a Keynote or PowerPoint slideshow.
