@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0 — 2026-10-08
+
+- See what a hidden alert is about: hover the eye button on the full-screen alert to peek, or click it to keep the details shown.
+- Pause Wi-Fi hiding for 1, 2 or 4 hours, or until midnight, from the menu-bar panel when you're on a network you haven't trusted.
+
 ## 1.0.2 — 2026-10-05
 
 - The menu-bar panel has rounded corners and a solid background on macOS 27, and its Test Alert, Settings and Quit buttons are evenly sized.
