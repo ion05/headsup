@@ -2,8 +2,7 @@
 
 ## 1.1.0 — 2026-10-08
 
-- See what a hidden alert is about: hover the eye button on the full-screen alert to peek, or click it to keep the details shown.
-- Pause Wi-Fi hiding for 1, 2 or 4 hours, or until midnight, from the menu-bar panel when you're on a network you haven't trusted.
+- See what a hidden alert is about: hover the "Details hidden" label on the full-screen alert to peek, or click it to keep the details shown.
 
 ## 1.0.2 — 2026-10-05
 

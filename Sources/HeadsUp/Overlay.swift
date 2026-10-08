@@ -197,8 +197,33 @@ private struct AlertRow: View {
         }
     }
 
-    /// Calendar name as a small pill tinted with its color.
-    private var tag: some View {
+    /// Calendar name as a small pill tinted with its color. When concealable, the whole pill is the
+    /// reveal control: hover peeks, click keeps the details shown.
+    @ViewBuilder private var tag: some View {
+        if concealable {
+            let help = pinned ? "Hide details" : "Show details"
+            Button {
+                if pinned { model.revealed.remove(alert.id) } else { model.revealed.insert(alert.id) }
+            } label: {
+                pill {
+                    // Sized to the wider label so the pill under the pointer never changes size.
+                    ZStack {
+                        Text("Details hidden").opacity(hidden ? 1 : 0)
+                        Text(alert.calendarTitle).opacity(hidden ? 0 : 1)
+                    }
+                }
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help(help)
+            .accessibilityLabel(help)
+            .onHover { peeking = $0 }
+        } else {
+            pill { Text(alert.calendarTitle) }
+        }
+    }
+
+    private func pill(_ label: () -> some View) -> some View {
         let color = hidden ? Color.secondary : Color(nsColor: alert.color)
         return HStack(spacing: 7) {
             Group {
@@ -206,43 +231,13 @@ private struct AlertRow: View {
                 else { Circle().fill(color).frame(width: 8, height: 8) }
             }
             .frame(width: concealable ? 14 : nil)
-            if concealable {
-                // Sized to the wider label so the pill, and the eye button under the pointer, never move.
-                ZStack {
-                    Text("Details hidden").opacity(hidden ? 1 : 0)
-                    Text(alert.calendarTitle).opacity(hidden ? 0 : 1)
-                }
-                revealButton
-            } else {
-                Text(alert.calendarTitle)
-            }
+            label()
         }
         .font(.system(size: 14, weight: .semibold))
         .foregroundStyle(hidden ? Color.secondary : Color.primary.opacity(0.75))
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(color.opacity(0.16), in: Capsule())
-    }
-
-    /// Eye toggle: hover peeks, click pins the reveal. Kept in the tag row whenever the alert is
-    /// concealable so it never shifts position as the reveal state changes.
-    @ViewBuilder private var revealButton: some View {
-        let icon = pinned ? "eye.slash" : "eye"
-        let help = pinned ? "Hide details" : "Show details"
-        let button = Button {
-            if pinned { model.revealed.remove(alert.id) } else { model.revealed.insert(alert.id) }
-        } label: {
-            Image(systemName: icon).font(.system(size: 11, weight: .semibold))
-        }
-        .help(help)
-        .accessibilityLabel(help)
-        .onHover { peeking = $0 }
-
-        if #available(macOS 26, *) {
-            button.buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.mini)
-        } else {
-            button.buttonStyle(Pill())
-        }
     }
 
     @ViewBuilder private func join(_ url: URL) -> some View {
