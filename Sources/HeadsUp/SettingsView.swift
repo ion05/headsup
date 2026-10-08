@@ -144,8 +144,7 @@ struct SettingsView: View {
             }
         }
 
-        Label(wifi.pausedUntil.map { "Paused \(pauseLabel($0))" }
-                ?? (engine.offTrustedWiFi ? "Details are hidden right now" : "Details are shown on this network"),
+        Label(engine.offTrustedWiFi ? "Details are hidden right now" : "Details are shown on this network",
               systemImage: engine.offTrustedWiFi ? "eye.slash" : "eye")
             .font(.callout)
             .foregroundStyle(.secondary)

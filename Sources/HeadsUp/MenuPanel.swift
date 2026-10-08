@@ -34,7 +34,6 @@ func shortDuration(_ seconds: TimeInterval) -> String {
 
 struct MenuPanel: View {
     @ObservedObject private var engine = Engine.shared
-    @ObservedObject private var wifi = WiFiWatcher.shared
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -136,31 +135,8 @@ struct MenuPanel: View {
                 Image(systemName: "eye.slash").frame(width: 16).foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Hide Event Details")
-                    if wifi.autoHide, let until = wifi.pausedUntil {
-                        HStack(spacing: 4) {
-                            Text("Wi-Fi hiding paused \(pauseLabel(until))").font(.system(size: 11)).foregroundStyle(.secondary)
-                            Button("Resume") { wifi.resume() }
-                                .font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Color.accentColor)
-                        }
-                    } else if engine.offTrustedWiFi {
-                        HStack(spacing: 4) {
-                            Text("Hidden — untrusted Wi-Fi").font(.system(size: 11)).foregroundStyle(.secondary)
-                            Menu {
-                                ForEach([1, 2, 4], id: \.self) { h in
-                                    Button(h == 1 ? "1 hour" : "\(h) hours") { wifi.pause(until: .now + Double(h) * 3600) }
-                                }
-                                Button("Until tomorrow") {
-                                    wifi.pause(until: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: .now))!)
-                                }
-                            } label: {
-                                Text("Show for…").font(.system(size: 11)).foregroundStyle(Color.accentColor)
-                            }
-                            // A plain-button menu draws our label; .borderlessButton ignores its font and color.
-                            .menuStyle(.button)
-                            .buttonStyle(.plain)
-                            .menuIndicator(.hidden)
-                            .fixedSize()
-                        }
+                    if engine.offTrustedWiFi {
+                        Text("Hidden — untrusted Wi-Fi").font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
@@ -365,11 +341,6 @@ private extension View {
     @ViewBuilder func glassButtonStyle() -> some View {
         if #available(macOS 26, *) { buttonStyle(.glass) } else { buttonStyle(.bordered) }
     }
-}
-
-/// "until 3:40 PM", or "until midnight" for the Until tomorrow pause.
-func pauseLabel(_ until: Date) -> String {
-    Calendar.current.startOfDay(for: until) == until ? "until midnight" : "until \(until.formatted(date: .omitted, time: .shortened))"
 }
 
 func timeRange(_ alert: Alert) -> String {
