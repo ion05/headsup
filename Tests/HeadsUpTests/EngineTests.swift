@@ -57,10 +57,16 @@ private func due(_ c: [(alert: Alert, offsets: Set<Int>)], at now: Date, _ fired
 }
 
 @Test func wifiHiding() {
-    #expect(!WiFiWatcher.hidden(autoHide: false, ssid: nil, trusted: []))         // feature off
-    #expect(!WiFiWatcher.hidden(autoHide: true, ssid: "Home", trusted: ["Home"]))  // trusted
-    #expect(WiFiWatcher.hidden(autoHide: true, ssid: "CoffeeShop", trusted: ["Home"])) // untrusted
-    #expect(WiFiWatcher.hidden(autoHide: true, ssid: nil, trusted: ["Home"]))      // off Wi-Fi / no Location access
+    let now = Date()
+    #expect(!WiFiWatcher.hidden(autoHide: false, ssid: nil, trusted: [], pausedUntil: nil, now: now))         // feature off
+    #expect(!WiFiWatcher.hidden(autoHide: true, ssid: "Home", trusted: ["Home"], pausedUntil: nil, now: now))  // trusted
+    #expect(WiFiWatcher.hidden(autoHide: true, ssid: "CoffeeShop", trusted: ["Home"], pausedUntil: nil, now: now)) // untrusted
+    #expect(WiFiWatcher.hidden(autoHide: true, ssid: nil, trusted: ["Home"], pausedUntil: nil, now: now))      // off Wi-Fi / no Location access
+
+    // Paused in the future overrides hiding even on untrusted Wi-Fi.
+    #expect(!WiFiWatcher.hidden(autoHide: true, ssid: "CoffeeShop", trusted: ["Home"], pausedUntil: now.addingTimeInterval(3600), now: now))
+    // An expired pause behaves as if not paused.
+    #expect(WiFiWatcher.hidden(autoHide: true, ssid: "CoffeeShop", trusted: ["Home"], pausedUntil: now.addingTimeInterval(-3600), now: now))
 }
 
 @Test func menuBarLabel() {

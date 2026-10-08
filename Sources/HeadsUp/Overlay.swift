@@ -84,6 +84,8 @@ import SwiftUI
 
 private final class OverlayModel: ObservableObject {
     @Published var alerts: [Alert]
+    /// Alert ids the user has clicked to keep revealed, shared across every display's panel.
+    @Published var revealed: Set<String> = []
     init(alerts: [Alert]) { self.alerts = alerts }
 }
 
@@ -106,7 +108,7 @@ private struct OverlayView: View {
 
             VStack(spacing: 56) {
                 ForEach(model.alerts) { alert in
-                    AlertRow(alert: alert, isDefault: alert.id == firstJoinID, compact: model.alerts.count > 1)
+                    AlertRow(model: model, alert: alert, isDefault: alert.id == firstJoinID, compact: model.alerts.count > 1)
                 }
                 controls
             }
@@ -146,14 +148,20 @@ private struct OverlayView: View {
 }
 
 private struct AlertRow: View {
+    @ObservedObject var model: OverlayModel
     let alert: Alert
     /// Return joins this alert.
     let isDefault: Bool
     /// Smaller type when several alerts share the screen.
     let compact: Bool
 
+    /// Hovering the eye button peeks at details; released, it hides again unless pinned.
+    @State private var peeking = false
+
     /// Read at render time so "Hide Event Details" applies to whatever shows next.
-    private var hidden: Bool { alert.isPrivate || Engine.shared.hidingDetails }
+    private var concealable: Bool { alert.isPrivate || Engine.shared.hidingDetails }
+    private var pinned: Bool { model.revealed.contains(alert.id) }
+    private var hidden: Bool { concealable && !pinned && !peeking }
 
     var body: some View {
         VStack(spacing: 18) {
@@ -193,15 +201,48 @@ private struct AlertRow: View {
     private var tag: some View {
         let color = hidden ? Color.secondary : Color(nsColor: alert.color)
         return HStack(spacing: 7) {
-            if hidden { Image(systemName: "eye.slash").font(.system(size: 11, weight: .semibold)) }
-            else { Circle().fill(color).frame(width: 8, height: 8) }
-            Text(hidden ? "Details hidden" : alert.calendarTitle)
+            Group {
+                if hidden { Image(systemName: "eye.slash").font(.system(size: 11, weight: .semibold)) }
+                else { Circle().fill(color).frame(width: 8, height: 8) }
+            }
+            .frame(width: concealable ? 14 : nil)
+            if concealable {
+                // Sized to the wider label so the pill, and the eye button under the pointer, never move.
+                ZStack {
+                    Text("Details hidden").opacity(hidden ? 1 : 0)
+                    Text(alert.calendarTitle).opacity(hidden ? 0 : 1)
+                }
+                revealButton
+            } else {
+                Text(alert.calendarTitle)
+            }
         }
         .font(.system(size: 14, weight: .semibold))
         .foregroundStyle(hidden ? Color.secondary : Color.primary.opacity(0.75))
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(color.opacity(0.16), in: Capsule())
+    }
+
+    /// Eye toggle: hover peeks, click pins the reveal. Kept in the tag row whenever the alert is
+    /// concealable so it never shifts position as the reveal state changes.
+    @ViewBuilder private var revealButton: some View {
+        let icon = pinned ? "eye.slash" : "eye"
+        let help = pinned ? "Hide details" : "Show details"
+        let button = Button {
+            if pinned { model.revealed.remove(alert.id) } else { model.revealed.insert(alert.id) }
+        } label: {
+            Image(systemName: icon).font(.system(size: 11, weight: .semibold))
+        }
+        .help(help)
+        .accessibilityLabel(help)
+        .onHover { peeking = $0 }
+
+        if #available(macOS 26, *) {
+            button.buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.mini)
+        } else {
+            button.buttonStyle(Pill())
+        }
     }
 
     @ViewBuilder private func join(_ url: URL) -> some View {
